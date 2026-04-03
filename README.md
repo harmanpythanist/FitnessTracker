@@ -6,3 +6,9 @@ working code ha.
 - Different pages ki seperate windows open hoti hn which doesnt look maharat wala kaam. 
 - Text thora sa blur ha
 - Kch buttons ka text bottom se nzr nahi arha
+
+**Verion_2**
+- Different FORMS for different pages
+- Text is clear
+- buttons are okay
+- GUI is to be improved
