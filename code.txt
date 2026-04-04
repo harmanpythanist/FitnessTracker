@@ -1,0 +1,976 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Windows.Forms;
+using project.Models;
+using project.Services;
+using project.UI;
+
+namespace project.Forms
+{
+    public class DashboardForm : Form
+    {
+        // ── Layout constants ──────────────────────────────────────────
+        const int SideMargin = 36;
+        const int HeaderH = 62;
+        const int SectionGap = 28;
+
+        // ── Font system — Segoe UI with strong weight contrast ────────
+        static readonly Font FontDisplay = new Font("Segoe UI", 28f, FontStyle.Bold);
+        static readonly Font FontTitle = new Font("Segoe UI", 15f, FontStyle.Bold);
+        static readonly Font FontSection = new Font("Segoe UI", 11f, FontStyle.Bold);
+        static readonly Font FontSubhead = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        static readonly Font FontBody = new Font("Segoe UI", 9f, FontStyle.Regular);
+        static readonly Font FontBodyBold = new Font("Segoe UI", 9f, FontStyle.Bold);
+        static readonly Font FontSmall = new Font("Segoe UI", 8f, FontStyle.Regular);
+        static readonly Font FontMicro = new Font("Segoe UI", 7.5f, FontStyle.Regular);
+        static readonly Font FontNav = new Font("Segoe UI", 10f, FontStyle.Regular);
+        static readonly Font FontNavBold = new Font("Segoe UI", 13f, FontStyle.Bold);
+
+        // ── Colors ────────────────────────────────────────────────────
+        static readonly Color ColPage = Color.FromArgb(245, 246, 248);
+        static readonly Color ColCard = Color.White;
+        static readonly Color ColBorder = Color.FromArgb(218, 218, 226);
+        static readonly Color ColText1 = Color.FromArgb(18, 18, 28);
+        static readonly Color ColText2 = Color.FromArgb(90, 90, 108);
+        static readonly Color ColText3 = Color.FromArgb(148, 148, 162);
+        static readonly Color ColAccent = Color.FromArgb(13, 110, 253);
+        static readonly Color ColOrange = Color.FromArgb(255, 140, 0);
+        static readonly Color ColGreen = Color.FromArgb(40, 167, 69);
+        static readonly Color ColPurple = Color.FromArgb(111, 66, 193);
+        static readonly Color ColTeal = Color.FromArgb(32, 178, 170);
+        static readonly Color ColRed = Color.FromArgb(220, 53, 69);
+
+        // ── Controls ──────────────────────────────────────────────────
+        Panel pnlTopBar;
+        Panel pnlMain;
+        Label lblWelcome;
+        Button btnLogout;
+        Button btnGoal;
+        Button btnActivity;
+        Button btnReset;
+
+        public DashboardForm()
+        {
+            Text = "FitTrack — Dashboard";
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = Color.White;
+            FormBorderStyle = FormBorderStyle.Sizable;
+            WindowState = FormWindowState.Maximized;
+
+            BuildUI();
+            this.Load += (s, e) => ShowDashboard();
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  UI Construction
+        // ─────────────────────────────────────────────────────────────
+        void BuildUI()
+        {
+            BuildTopBar();
+            BuildMainPanel();
+        }
+
+        void BuildTopBar()
+        {
+            pnlTopBar = new Panel
+            {
+                Left = 0,
+                Top = 0,
+                Width = ClientSize.Width,
+                Height = HeaderH,
+                BackColor = Color.White,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            pnlTopBar.Controls.Add(new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 1,
+                BackColor = ColBorder
+            });
+
+            // App title
+            pnlTopBar.Controls.Add(new Label
+            {
+                Text = "🏃 FitTrack",
+                Left = SideMargin,
+                Top = 10,
+                Width = 200,          // tighter width so welcome label has room
+                Height = HeaderH,
+                AutoSize = false,
+                Font = FontNavBold,
+                ForeColor = ColText1,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            });
+
+            // Divider dot between title and welcome
+            pnlTopBar.Controls.Add(new Label
+            {
+                Text = "·",
+                Left = SideMargin + 132,
+                Top = 0,
+                Width = 16,
+                Height = HeaderH,
+                AutoSize = false,
+                Font = new Font("Segoe UI", 14f, FontStyle.Bold),
+                ForeColor = ColText3,
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent
+            });
+
+            // Welcome label — starts right after the dot
+            lblWelcome = new Label
+            {
+                Left = SideMargin + 200,
+                Top = 10,
+                Width = 200,
+                Height = HeaderH,
+                AutoSize = false,
+                Font = FontNav,
+                ForeColor = ColText2,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            };
+            pnlTopBar.Controls.Add(lblWelcome);
+
+            // Logout — right after welcome
+            btnLogout = MakeTopButton("⏻  Logout", ColRed);
+            btnLogout.Left = lblWelcome.Left + lblWelcome.Width + 8;
+            btnLogout.Top = (HeaderH - btnLogout.Height) / 2;
+            btnLogout.Click += OnLogout;
+            pnlTopBar.Controls.Add(btnLogout);
+
+            // Right-side buttons
+            btnActivity = MakeTopButton("＋ Activity", ColAccent);
+            btnActivity.Top = (HeaderH - btnActivity.Height) / 2;
+            btnActivity.Click += (s, e) => { new ActivityForm().ShowDialog(); ShowDashboard(); };
+            pnlTopBar.Controls.Add(btnActivity);
+
+            btnGoal = MakeTopButton("🎯 Set Goal", Color.FromArgb(108, 117, 125));
+            btnGoal.Top = btnActivity.Top;
+            btnGoal.Click += (s, e) => { new GoalForm().ShowDialog(); ShowDashboard(); };
+            pnlTopBar.Controls.Add(btnGoal);
+
+            btnReset = MakeTopButton("↺  Reset", ColRed);
+            btnReset.Top = btnActivity.Top;
+            btnReset.Click += OnReset;
+            pnlTopBar.Controls.Add(btnReset);
+
+            // Reposition right buttons on resize
+            pnlTopBar.Resize += (s, e) =>
+            {
+                btnActivity.Left = pnlTopBar.Width - SideMargin - btnActivity.Width;
+                btnGoal.Left = btnActivity.Left - btnGoal.Width - 10;
+                btnReset.Left = btnGoal.Left - btnReset.Width - 10;
+            };
+
+            Controls.Add(pnlTopBar);
+        }
+
+        void BuildMainPanel()
+        {
+            pnlMain = new Panel
+            {
+                Left = 0,
+                Top = HeaderH,
+                Width = ClientSize.Width,
+                Height = ClientSize.Height - HeaderH,
+                BackColor = ColPage,
+                AutoScroll = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Bottom
+                           | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            pnlMain.Resize += (s, e) => ShowDashboard();
+            Controls.Add(pnlMain);
+        }
+
+        Button MakeTopButton(string text, Color accent)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Width = 118,
+                Height = 34,
+                FlatStyle = FlatStyle.Flat,
+                Font = FontBody,
+                ForeColor = accent,
+                BackColor = Color.White,
+                Cursor = Cursors.Hand
+            };
+            btn.FlatAppearance.BorderColor = ColBorder;
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(246, 246, 248);
+            return btn;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Helpers
+        // ─────────────────────────────────────────────────────────────
+        Label SectionLabel(string text, int left, int top) => new Label
+        {
+            Text = text,
+            Left = left,
+            Top = top,
+            AutoSize = true,
+            Font = FontSection,
+            ForeColor = ColText1,
+            BackColor = Color.Transparent
+        };
+
+        Panel WhiteCard(int left, int top, int width, int height)
+        {
+            var p = new Panel
+            {
+                Left = left,
+                Top = top,
+                Width = width,
+                Height = height,
+                BackColor = ColCard
+            };
+            p.Paint += (s, e) =>
+            {
+                using var pen = new Pen(ColBorder, 1);
+                e.Graphics.DrawRectangle(pen, 0, 0, p.Width - 1, p.Height - 1);
+            };
+            return p;
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Arc Gauge + Mini Stat Cards
+        // ─────────────────────────────────────────────────────────────
+        void AddGoalProgressSection(int top, double todayTotal, double goal,
+                                    int todayCount, double allTime)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+            int H = 180;
+            double pct = goal > 0 ? Math.Min(1.0, todayTotal / goal) : 0;
+            bool achieved = todayTotal >= goal && goal > 0;
+            Color arcColor = achieved ? ColGreen : ColAccent;
+
+            var card = WhiteCard(SideMargin, top, W, H);
+
+            card.Paint += (s, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                // Re-draw border (WhiteCard draws it but we override here for control)
+                using var border = new Pen(ColBorder, 1);
+                g.DrawRectangle(border, 0, 0, card.Width - 1, card.Height - 1);
+
+                // ── Arc ───────────────────────────────────────────────
+                int cx = 118, cy = 148, r = 88;
+                float startAngle = 180f, fullSweep = 180f;
+                float fillSweep = (float)(fullSweep * pct);
+
+                // Track
+                using var trackPen = new Pen(Color.FromArgb(236, 236, 242), 16);
+                trackPen.StartCap = LineCap.Round;
+                trackPen.EndCap = LineCap.Round;
+                g.DrawArc(trackPen, cx - r, cy - r, r * 2, r * 2, startAngle, fullSweep);
+
+                // Fill
+                if (fillSweep > 0)
+                {
+                    using var fillPen = new Pen(arcColor, 16);
+                    fillPen.StartCap = LineCap.Round;
+                    fillPen.EndCap = LineCap.Round;
+                    g.DrawArc(fillPen, cx - r, cy - r, r * 2, r * 2, startAngle, fillSweep);
+
+                    double tip = Math.PI + Math.PI * pct;
+                    int tipX = (int)(cx + r * Math.Cos(tip));
+                    int tipY = (int)(cy + r * Math.Sin(tip));
+                    g.FillEllipse(Brushes.White, tipX - 9, tipY - 9, 18, 18);
+                    using var db = new Pen(arcColor, 2.5f);
+                    g.DrawEllipse(db, tipX - 9, tipY - 9, 18, 18);
+                }
+
+                // % — large display font, centered in arc
+                int textCY = cy - r / 2;
+                string pctText = goal > 0 ? $"{(int)(pct * 100)}%" : "—";
+
+                using var pctBrush = new SolidBrush(ColText1);
+                SizeF pctSz = g.MeasureString(pctText, FontDisplay);
+                g.DrawString(pctText, FontDisplay, pctBrush,
+                    cx - pctSz.Width / 2,
+                    textCY - pctSz.Height / 2);
+
+                // "of goal" — light, small, directly below %
+                using var subBrush = new SolidBrush(ColText3);
+                SizeF subSz = g.MeasureString("of goal", FontSmall);
+                float subY = textCY - pctSz.Height / 2 + pctSz.Height + 2f;
+                g.DrawString("of goal", FontSmall, subBrush,
+                    cx - subSz.Width / 2, subY);
+
+                // Status — colored, below "of goal"
+                string msg = goal <= 0 ? "No goal set"
+                              : achieved ? "Goal achieved!"
+                                           : $"{goal - todayTotal:F0} kcal left";
+                Color msgCol = goal <= 0 ? ColText3
+                              : achieved ? ColGreen
+                                           : ColOrange;
+                using var msgBrush = new SolidBrush(msgCol);
+                SizeF msgSz = g.MeasureString(msg, FontSmall);
+                g.DrawString(msg, FontSmall, msgBrush,
+                    cx - msgSz.Width / 2,
+                    subY + subSz.Height + 4f);
+
+                // Vertical divider
+                int divX = cx + r + 28;
+                using var divPen = new Pen(Color.FromArgb(228, 228, 236), 1);
+                g.DrawLine(divPen, divX, 16, divX, H - 16);
+            };
+
+            // ── Mini stat cards ────────────────────────────────────────
+            int divX2 = 118 + 88 + 28;
+            int rightX = divX2 + 22;
+            int availW = W - rightX - 16;
+            int miniW = (availW - 30) / 4;
+            int miniH = 126;
+            int miniY = (H - miniH) / 2;
+
+            string[] labels = { "Today Burned", "Calorie Goal", "Today Sessions", "All-Time Burned" };
+            string[] values =
+            {
+                $"{todayTotal:F0} kcal",
+                goal > 0 ? $"{goal:F0} kcal" : "Not Set",
+                todayCount.ToString(),
+                $"{allTime:F0} kcal"
+            };
+            Color[] colors = { ColOrange, ColAccent, ColPurple, ColTeal };
+
+            for (int i = 0; i < 4; i++)
+            {
+                string lbl = labels[i], val = values[i];
+                Color col = colors[i];
+                int mx = rightX + i * (miniW + 10);
+
+                var mini = new Panel
+                {
+                    Left = mx,
+                    Top = miniY,
+                    Width = miniW,
+                    Height = miniH,
+                    BackColor = ColPage
+                };
+
+                mini.Paint += (ms, me) =>
+                {
+                    var g = me.Graphics;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                    // Top accent
+                    using var ab = new SolidBrush(col);
+                    g.FillRectangle(ab, 0, 0, mini.Width, 3);
+
+                    // Border
+                    using var pb = new Pen(ColBorder, 1);
+                    g.DrawRectangle(pb, 0, 0, mini.Width - 1, mini.Height - 1);
+
+                    // Label — light and small
+                    using var lb = new SolidBrush(ColText3);
+                    g.DrawString(lbl, FontSmall, lb, 12, 16);
+
+                    // Value — large bold
+                    using var vb = new SolidBrush(ColText1);
+                    g.DrawString(val, FontBodyBold, vb, 12, 40);
+
+                    // Color dot
+                    using var db = new SolidBrush(Color.FromArgb(36, col.R, col.G, col.B));
+                    using var dp = new Pen(col, 1.5f);
+                    g.FillEllipse(db, mini.Width - 22, 14, 10, 10);
+                    g.DrawEllipse(dp, mini.Width - 22, 14, 10, 10);
+                };
+
+                card.Controls.Add(mini);
+            }
+
+            pnlMain.Controls.Add(card);
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Weekly Bar Chart — improved
+        // ─────────────────────────────────────────────────────────────
+        void AddWeeklyChart(int top, List<ActivityEntry> allActivities)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+            int H = 160;
+
+            pnlMain.Controls.Add(SectionLabel("This Week", SideMargin, top));
+
+            // Build Mon–Sun
+            var startOfWeek = DateTime.Today.DayOfWeek == DayOfWeek.Sunday
+                ? DateTime.Today.AddDays(-6)
+                : DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + 1);
+
+            string[] dayLabels = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+            double[] dayTotals = new double[7];
+            for (int d = 0; d < 7; d++)
+                dayTotals[d] = allActivities
+                    .Where(a => a.Date.Date == startOfWeek.AddDays(d))
+                    .Sum(a => a.CaloriesBurned);
+
+            double maxVal = dayTotals.Max();
+            int todayIdx = ((int)DateTime.Today.DayOfWeek + 6) % 7;
+
+            var chart = WhiteCard(SideMargin, top + 30, W, H);
+
+            chart.Paint += (s, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                int padX = 40, padTop = 24, padBot = 32;
+                int areaH = H - padTop - padBot;
+                int totalW = chart.Width - padX * 2;
+                int barW = Math.Max(20, totalW / 7 - 14);
+                int barGap = (totalW - barW * 7) / 7;
+
+                // Horizontal guide lines
+                int guides = 4;
+                for (int gi = 0; gi <= guides; gi++)
+                {
+                    int gy = padTop + (int)(areaH * gi / (float)guides);
+                    double gVal = maxVal > 0 ? maxVal * (guides - gi) / guides : 0;
+                    using var gp = new Pen(Color.FromArgb(236, 236, 242), 1);
+                    g.DrawLine(gp, padX, gy, chart.Width - padX, gy);
+
+                    if (gVal > 0)
+                    {
+                        string gl = gVal >= 1000 ? $"{gVal / 1000:F1}k" : $"{gVal:F0}";
+                        using var gb = new SolidBrush(ColText3);
+                        SizeF gsz = g.MeasureString(gl, FontMicro);
+                        g.DrawString(gl, FontMicro, gb, padX - gsz.Width - 4, gy - gsz.Height / 2);
+                    }
+                }
+
+                for (int d = 0; d < 7; d++)
+                {
+                    int bx = padX + d * (barW + barGap) + barGap / 2;
+                    bool isToday = d == todayIdx;
+                    bool hasCal = dayTotals[d] > 0;
+
+                    int bh = maxVal > 0
+                        ? Math.Max(4, (int)(areaH * (dayTotals[d] / maxVal)))
+                        : 4;
+                    int by = padTop + areaH - bh;
+
+                    // Bar — rounded top via GraphicsPath
+                    int radius = Math.Min(6, barW / 3);
+                    var path = new GraphicsPath();
+                    path.AddArc(bx, by, radius * 2, radius * 2, 180, 90);
+                    path.AddArc(bx + barW - radius * 2, by, radius * 2, radius * 2, 270, 90);
+                    path.AddLine(bx + barW, by + radius, bx + barW, by + bh);
+                    path.AddLine(bx + barW, by + bh, bx, by + bh);
+                    path.CloseFigure();
+
+                    Color barCol = isToday ? ColAccent : Color.FromArgb(196, 212, 248);
+                    using var bb = new SolidBrush(barCol);
+                    g.FillPath(bb, path);
+
+                    // Today gets a subtle glow base
+                    if (isToday)
+                    {
+                        using var glowBrush = new SolidBrush(Color.FromArgb(20, ColAccent.R, ColAccent.G, ColAccent.B));
+                        g.FillRectangle(glowBrush, bx - 4, by + bh, barW + 8, 4);
+                    }
+
+                    // Day label
+                    Color dc = isToday ? ColAccent : ColText3;
+                    using var db = new SolidBrush(dc);
+                    Font df = isToday ? FontBodyBold : FontSmall;
+                    SizeF ls = g.MeasureString(dayLabels[d], df);
+                    g.DrawString(dayLabels[d], df, db,
+                        bx + (barW - ls.Width) / 2,
+                        H - padBot + 6);
+
+                    // Calorie label above bar
+                    if (hasCal)
+                    {
+                        string cv = dayTotals[d] >= 1000
+                            ? $"{dayTotals[d] / 1000:F1}k" : $"{dayTotals[d]:F0}";
+                        using var cb = new SolidBrush(isToday ? ColAccent : ColText2);
+                        SizeF cs = g.MeasureString(cv, FontMicro);
+                        g.DrawString(cv, FontMicro, cb,
+                            bx + (barW - cs.Width) / 2, by - cs.Height - 3);
+                    }
+                }
+            };
+
+            pnlMain.Controls.Add(chart);
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Quick Stats
+        // ─────────────────────────────────────────────────────────────
+        void AddQuickStats(int top, List<ActivityEntry> all)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+
+            pnlMain.Controls.Add(SectionLabel("Quick Stats", SideMargin, top));
+
+            int totalSessions = all.Count;
+            double avgCal = totalSessions > 0 ? all.Average(a => a.CaloriesBurned) : 0;
+            string bestDay = "—";
+
+            if (all.Count > 0)
+            {
+                var best = all
+                    .GroupBy(a => a.Date.Date)
+                    .Select(g => new { Day = g.Key, Total = g.Sum(a => a.CaloriesBurned) })
+                    .OrderByDescending(x => x.Total).First();
+                bestDay = $"{best.Day:ddd dd MMM}  ({best.Total:F0} kcal)";
+            }
+
+            string[] slabels = { "Total Sessions", "Avg Cal / Session", "Best Day" };
+            string[] svalues = { totalSessions.ToString(), $"{avgCal:F0} kcal", bestDay };
+            Color[] scolors = { ColPurple, ColTeal, ColOrange };
+
+            int cW = (W - 20) / 3;
+            int cH = 80;
+
+            for (int i = 0; i < 3; i++)
+            {
+                string lbl = slabels[i], val = svalues[i];
+                Color col = scolors[i];
+                var c = WhiteCard(SideMargin + i * (cW + 10), top + 30, cW, cH);
+
+                c.Paint += (s, e) =>
+                {
+                    var g = e.Graphics;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                    // Left stripe
+                    using var sb = new SolidBrush(col);
+                    g.FillRectangle(sb, 0, 0, 4, cH);
+
+                    // Label
+                    using var lb = new SolidBrush(ColText3);
+                    g.DrawString(lbl, FontSmall, lb, 16, 12);
+
+                    // Value — bold and larger
+                    using var vb = new SolidBrush(ColText1);
+                    g.DrawString(val, FontSection, vb, 16, 36);
+                };
+
+                pnlMain.Controls.Add(c);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Personal Records
+        // ─────────────────────────────────────────────────────────────
+        void AddPersonalRecords(int top, List<ActivityEntry> all)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+
+            pnlMain.Controls.Add(SectionLabel("Personal Records", SideMargin, top));
+
+            var records = all
+                .GroupBy(a => a.ActivityName)
+                .Select(g => new
+                {
+                    Name = g.Key,
+                    Best = g.Max(a => a.CaloriesBurned),
+                    Count = g.Count()
+                })
+                .OrderByDescending(r => r.Best)
+                .ToList();
+
+            if (records.Count == 0)
+            {
+                pnlMain.Controls.Add(new Label
+                {
+                    Text = "No activities recorded yet.",
+                    Left = SideMargin,
+                    Top = top + 32,
+                    AutoSize = true,
+                    Font = FontSubhead,
+                    ForeColor = ColText3,
+                    BackColor = Color.Transparent
+                });
+                return;
+            }
+
+            Color[] medalColors =
+            {
+                Color.FromArgb(212, 175, 55),
+                Color.FromArgb(160, 160, 160),
+                Color.FromArgb(176, 115,  65)
+            };
+
+            int cardW = Math.Min(210, (W - (records.Count - 1) * 12) / records.Count);
+            int cardH = 96;
+
+            for (int i = 0; i < records.Count; i++)
+            {
+                var rec = records[i];
+                Color col = i < 3 ? medalColors[i] : ColAccent;
+                int cx = SideMargin + i * (cardW + 12);
+                var card = WhiteCard(cx, top + 30, cardW, cardH);
+
+                card.Paint += (s, e) =>
+                {
+                    var g = e.Graphics;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                    // Top stripe
+                    using var sb = new SolidBrush(col);
+                    g.FillRectangle(sb, 0, 0, card.Width, 3);
+
+                    // Rank
+                    string rank = i == 0 ? "🥇" : i == 1 ? "🥈" : i == 2 ? "🥉" : $"#{i + 1}";
+                    using var rb = new SolidBrush(ColText3);
+                    g.DrawString(rank, FontSmall, rb, 12, 12);
+
+                    // Activity name
+                    using var nb = new SolidBrush(ColText1);
+                    g.DrawString(rec.Name, FontBodyBold, nb, 12, 32);
+
+                    // Best calories — colored
+                    using var bb = new SolidBrush(col);
+                    g.DrawString($"{rec.Best:F0} kcal", FontSection, bb, 12, 54);
+
+                    // Session count — bottom right, micro
+                    using var cb = new SolidBrush(ColText3);
+                    string sc = rec.Count == 1 ? "1 session" : $"{rec.Count} sessions";
+                    SizeF ss = g.MeasureString(sc, FontMicro);
+                    g.DrawString(sc, FontMicro, cb,
+                        card.Width - ss.Width - 10, cardH - ss.Height - 8);
+                };
+
+                pnlMain.Controls.Add(card);
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Today's Calorie Breakdown
+        // ─────────────────────────────────────────────────────────────
+        void AddActivityBreakdown(int top, List<ActivityEntry> activities)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+
+            pnlMain.Controls.Add(SectionLabel("Today's Calorie Breakdown", SideMargin, top));
+
+            var grouped = activities
+                .GroupBy(a => a.ActivityName)
+                .Select(g => new { Name = g.Key, Count = g.Count(), Calories = g.Sum(a => a.CaloriesBurned) })
+                .OrderByDescending(g => g.Calories)
+                .ToList();
+
+            if (grouped.Count == 0)
+            {
+                pnlMain.Controls.Add(new Label
+                {
+                    Text = "No activities recorded today.",
+                    Left = SideMargin,
+                    Top = top + 32,
+                    AutoSize = true,
+                    Font = FontSubhead,
+                    ForeColor = ColText3,
+                    BackColor = Color.Transparent
+                });
+                return;
+            }
+
+            int tableTop = top + 30;
+            int rowHeight = 38;
+
+            var header = WhiteCard(SideMargin, tableTop, W, rowHeight);
+            header.BackColor = Color.FromArgb(238, 239, 243);
+
+            AddTableCell(header, "Activity", 0, W, rowHeight, true);
+            AddTableCell(header, "Sessions", W / 2, W, rowHeight, true);
+            AddTableCell(header, "Calories Burned", W * 3 / 4, W, rowHeight, true);
+            pnlMain.Controls.Add(header);
+
+            double maxCal = grouped.Max(g => g.Calories);
+
+            for (int i = 0; i < grouped.Count; i++)
+            {
+                var item = grouped[i];
+                Color rowBg = i % 2 == 0 ? Color.White : Color.FromArgb(249, 249, 252);
+                var row = new Panel
+                {
+                    Left = SideMargin,
+                    Top = tableTop + rowHeight + i * rowHeight,
+                    Width = W,
+                    Height = rowHeight,
+                    BackColor = rowBg
+                };
+
+                row.Paint += (s, e) =>
+                {
+                    using var pen = new Pen(Color.FromArgb(232, 232, 238));
+                    e.Graphics.DrawLine(pen, 0, row.Height - 1, row.Width, row.Height - 1);
+                };
+
+                AddTableCell(row, item.Name, 0, W, rowHeight, false);
+                AddTableCell(row,
+                    item.Count == 1 ? "1 session" : $"{item.Count} sessions",
+                    W / 2, W, rowHeight, false);
+
+                int calX = W * 3 / 4;
+                int barMaxW = W / 4 - 90;
+                int barW = maxCal > 0 ? (int)(barMaxW * (item.Calories / maxCal)) : 0;
+
+                row.Controls.Add(new Label
+                {
+                    Text = $"{item.Calories:F1} kcal",
+                    Left = calX,
+                    Top = 0,
+                    Width = 86,
+                    Height = rowHeight,
+                    Font = FontBodyBold,
+                    ForeColor = ColOrange,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent
+                });
+
+                if (barW > 0)
+                    row.Controls.Add(new Panel
+                    {
+                        Left = calX + 88,
+                        Top = (rowHeight - 8) / 2,
+                        Width = barW,
+                        Height = 8,
+                        BackColor = Color.FromArgb(255, 210, 120)
+                    });
+
+                pnlMain.Controls.Add(row);
+            }
+        }
+
+        void AddTableCell(Panel parent, string text, int x, int W, int rowH, bool isHeader)
+        {
+            parent.Controls.Add(new Label
+            {
+                Text = text,
+                Left = x + 12,
+                Top = 0,
+                Width = W / 4 - 12,
+                Height = rowH,
+                Font = isHeader ? FontBodyBold : FontSubhead,
+                ForeColor = isHeader ? ColText2 : ColText1,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            });
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Activity Log
+        // ─────────────────────────────────────────────────────────────
+        void AddActivityLog(int top, List<ActivityEntry> all)
+        {
+            int W = pnlMain.Width - SideMargin * 2;
+            int rowHeight = 38;
+
+            pnlMain.Controls.Add(SectionLabel("Activity Log", SideMargin, top));
+
+            if (all.Count == 0)
+            {
+                pnlMain.Controls.Add(new Label
+                {
+                    Text = "No activities recorded yet.",
+                    Left = SideMargin,
+                    Top = top + 32,
+                    AutoSize = true,
+                    Font = FontSubhead,
+                    ForeColor = ColText3,
+                    BackColor = Color.Transparent
+                });
+                return;
+            }
+
+            int tableTop = top + 30;
+
+            var header = WhiteCard(SideMargin, tableTop, W, rowHeight);
+            header.BackColor = Color.FromArgb(238, 239, 243);
+
+            AddLogCell(header, "Date", 0, W, rowHeight, true);
+            AddLogCell(header, "Activity", W / 2, W, rowHeight, true);
+            AddLogCell(header, "Calories", W * 5 / 6, W, rowHeight, true);
+            pnlMain.Controls.Add(header);
+
+            var sorted = all.OrderByDescending(a => a.Date).ToList();
+
+            for (int i = 0; i < sorted.Count; i++)
+            {
+                var a = sorted[i];
+                Color rowBg = i % 2 == 0 ? Color.White : Color.FromArgb(249, 249, 252);
+                var row = new Panel
+                {
+                    Left = SideMargin,
+                    Top = tableTop + rowHeight + i * rowHeight,
+                    Width = W,
+                    Height = rowHeight,
+                    BackColor = rowBg
+                };
+
+                row.Paint += (s, e) =>
+                {
+                    using var pen = new Pen(Color.FromArgb(232, 232, 238));
+                    e.Graphics.DrawLine(pen, 0, row.Height - 1, row.Width, row.Height - 1);
+                };
+
+                AddLogCell(row, a.Date.ToString("ddd dd MMM, HH:mm"), 0, W, rowHeight, false);
+                AddLogCell(row, a.ActivityName, W / 2, W, rowHeight, false);
+
+                row.Controls.Add(new Label
+                {
+                    Text = $"{a.CaloriesBurned:F1} kcal",
+                    Left = W * 5 / 6 + 12,
+                    Top = 0,
+                    Width = W / 6 - 12,
+                    Height = rowHeight,
+                    Font = FontBodyBold,
+                    ForeColor = ColOrange,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    BackColor = Color.Transparent
+                });
+
+                pnlMain.Controls.Add(row);
+            }
+        }
+
+        void AddLogCell(Panel parent, string text, int x, int W, int rowH, bool isHeader)
+        {
+            parent.Controls.Add(new Label
+            {
+                Text = text,
+                Left = x + 12,
+                Top = 0,
+                Width = W / 3 - 12,
+                Height = rowH,
+                Font = isHeader ? FontBodyBold : FontSubhead,
+                ForeColor = isHeader ? ColText2 : ColText1,
+                TextAlign = ContentAlignment.MiddleLeft,
+                BackColor = Color.Transparent
+            });
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Dashboard Rendering
+        // ─────────────────────────────────────────────────────────────
+        void ShowDashboard()
+        {
+            var u = UserStore.CurrentUser;
+            if (u == null) { MessageBox.Show("No user session found."); return; }
+
+            lblWelcome.Text = $"Hello, {u.Username} 👋";
+            pnlMain.Controls.Clear();
+
+            // ── Page heading ──────────────────────────────────────────
+           
+
+            pnlMain.Controls.Add(new Label
+            {
+                Text = $"📅  {DateTime.Today:dddd, dd MMMM yyyy}",
+                ForeColor = ColText3,
+                Font = FontSmall,
+                Left = SideMargin,
+                Top = 48,
+                AutoSize = true,
+                BackColor = Color.Transparent
+            });
+
+            // ── Data ──────────────────────────────────────────────────
+            double todayTotal = u.GetTodayCalories();
+            int todayCount = u.GetTodayActivityCount();
+            double goal = u.CalorieGoal;
+            double allTime = u.GetTotalCalories();
+
+            // ── Stack sections ────────────────────────────────────────
+            int y = 78;
+
+            AddGoalProgressSection(y, todayTotal, goal, todayCount, allTime);
+            y += 180 + SectionGap;
+
+            AddWeeklyChart(y, u.Activities);
+            y += 30 + 160 + SectionGap;
+
+            AddQuickStats(y, u.Activities);
+            y += 30 + 80 + SectionGap;
+
+            Divider(y); y += 14;
+
+            AddActivityBreakdown(y, u.Activities
+                .Where(a => a.Date.Date == DateTime.Today).ToList());
+
+            int todayRows = u.Activities.Count(a => a.Date.Date == DateTime.Today);
+            y += 30 + 38 * (Math.Max(1, todayRows) + 1) + SectionGap;
+
+            Divider(y); y += 14;
+
+            AddPersonalRecords(y, u.Activities);
+
+            int recCount = u.Activities.Select(a => a.ActivityName).Distinct().Count();
+            y += 30 + 96 + SectionGap;
+
+            Divider(y); y += 14;
+
+            AddActivityLog(y, u.Activities);
+        }
+
+        void Divider(int top)
+        {
+            pnlMain.Controls.Add(new Panel
+            {
+                Left = SideMargin,
+                Top = top,
+                Width = pnlMain.Width - SideMargin * 2,
+                Height = 1,
+                BackColor = ColBorder
+            });
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Reset
+        // ─────────────────────────────────────────────────────────────
+        void OnReset(object sender, EventArgs e)
+        {
+            var confirm = MessageBox.Show(
+                "This will remove all of today's activities and reset your calorie goal.\n\nAre you sure?",
+                "Reset Data",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirm != DialogResult.Yes) return;
+
+            var u = UserStore.CurrentUser;
+            if (u == null) return;
+
+            // Remove today's activities
+            u.Activities.RemoveAll(a => a.Date.Date == DateTime.Today);
+
+            // Reset goal
+            u.CalorieGoal = 0;
+
+            UserStore.Save();
+            ShowDashboard();
+        }
+
+        // ─────────────────────────────────────────────────────────────
+        //  Logout
+        // ─────────────────────────────────────────────────────────────
+        void OnLogout(object sender, EventArgs e)
+        {
+            var confirm = MessageBox.Show(
+                "Are you sure you want to logout?",
+                "Logout",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (confirm != DialogResult.Yes) return;
+
+            UserStore.Logout();
+            new LoginForm().Show();
+            this.Close();
+        }
+    }
+}
