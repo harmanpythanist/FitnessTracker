@@ -12,3 +12,12 @@ working code ha.
 - Text is clear
 - buttons are okay
 - GUI is to be improved
+
+**Version_3**
+- improved gui
+- metrics to be improved and hover effect to be added to the widgets
+
+**Version_4**
+- hover effect added
+- metrics and calculations updated
+- improved gui
