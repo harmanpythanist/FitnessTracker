@@ -21,3 +21,8 @@ working code ha.
 - hover effect added
 - metrics and calculations updated
 - improved gui
+
+**Version_5**
+- For signup: user is required to enter name and phone number (including username and password)
+- Dashboard: User cannot set new goal before completing previous one
+- Each activity in activity log is given a different entry in dashboard
